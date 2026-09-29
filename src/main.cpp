@@ -11,8 +11,8 @@
 uint8_t receiver_mac_address[] = {0x7C, 0x4F, 0xAD, 0xB7, 0xBC, 0x64};
 
 typedef struct struct_message {
-    int8_t steering;
-    int8_t throttle;
+    int16_t steering;
+    int16_t throttle;
 } struct_message;
 
 struct_message myData;
@@ -50,16 +50,23 @@ extern "C" void app_main(void) {
     config.atten = ADC_ATTEN_DB_12;         // 12dB attenuation to read full 0-3.3V range
     adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_3, &config);
 
+    adc_oneshot_chan_cfg_t config2 = {};
+    config2.bitwidth = ADC_BITWIDTH_DEFAULT; // 12-bit resolution (0-4095)
+    config2.atten = ADC_ATTEN_DB_12;         // 12dB attenuation to read full 0-3.3V range
+    adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_4, &config2);
+
     while (1) {
-        int adc_raw = 0;
-        adc_oneshot_read(adc1_handle, ADC_CHANNEL_3, &adc_raw);
+        int adc_raw_ch3 = 0;
+        int adc_raw_ch4 = 0;
+        adc_oneshot_read(adc1_handle, ADC_CHANNEL_3, &adc_raw_ch3);
+        adc_oneshot_read(adc1_handle, ADC_CHANNEL_4, &adc_raw_ch4);
 
         // Map the 0-4095 ADC reading to -100 to 100 for the steering
-        myData.steering = (int8_t)((adc_raw * 200 / 4095) - 100);
-        myData.throttle = 0; // Fixed at 0 for now
-        
-        printf("Potentiometer Raw: %d | Steering Data: %d\n", adc_raw, myData.steering);
-        
+        myData.steering = (int16_t)((adc_raw_ch3 * 200 / 4095) - 100);
+        myData.throttle = (int16_t)((adc_raw_ch4 * 200 / 4095) - 100); // Fixed at 0 for now
+
+        printf("Potentiometer Raw: %d, %d | Steering Data: %d | Throttle Data: %d\n", adc_raw_ch3, adc_raw_ch4, myData.steering, myData.throttle);
+
         esp_now_send(receiver_mac_address, (uint8_t *) &myData, sizeof(myData));
         vTaskDelay(50 / portTICK_PERIOD_MS); // Update 20 times per second
     }
